@@ -37,4 +37,3 @@ namespace JsonToXmlAdapterExample.Options
         public BooleanHandling BooleanHandling { get; set; } = BooleanHandling.TrueFalse;
     }
 }
-
