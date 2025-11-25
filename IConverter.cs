@@ -9,4 +9,3 @@ namespace JsonToXmlAdapterExample.Contracts
         string Convert(string input, Options.ConverterOptions options = null);
     }
 }
-
