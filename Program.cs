@@ -1,24 +1,63 @@
-name: PR Agent for NUWM
+using System;
+using System.Text.Json;
+using System.Xml.Linq;
 
-on:
-  pull_request:
-    types: [ opened, reopened, synchronize, edited ]
+namespace LabWork.Adapters
+{
+    // Адаптер який реалізує IConverter і перетворює JSON у XML
+    public class JsonToXmlAdapter : IConverter
+    {
+        public string Convert(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                throw new ArgumentException("Input JSON is empty", nameof(input));
 
-jobs:
-  pr_agent_job:
-    runs-on: ubuntu-latest
-    name: Run pr agent on every pull request
-    steps:
-      - name: pr-agent-nuwm
-        uses: EzGrade/Pr-Agent-NUWM@main
-        env:
-          GIT_APP_ID: ${{ secrets.GIT_APP_ID }}
-          GIT_PRIVATE_KEY: ${{ secrets.GIT_PRIVATE_KEY }}
-          GIT_INSTALLATION_ID: ${{ secrets.GIT_INSTALLATION_ID }}
-          GIT_REPOSITORY: ${{ github.repository }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
-          GOOGLE_CREDENTIALS_CONTENT: ${{ secrets.GOOGLE_CREDENTIALS_CONTENT }}
-          GOOGLE_SPREADSHEET_URL: ${{ secrets.GOOGLE_SPREADSHEET_URL }}
-          GOOGLE_SHEETS_NAMING: ${{ secrets.GOOGLE_SHEETS_NAMING }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            using var doc = JsonDocument.Parse(input);
+
+            var rootElement = new XElement("Root");
+            ConvertElement(doc.RootElement, rootElement);
+
+            var xdoc = new XDocument(rootElement);
+            return xdoc.ToString();
+        }
+
+        private void ConvertElement(JsonElement element, XElement parent)
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    foreach (var prop in element.EnumerateObject())
+                    {
+                        var child = new XElement(prop.Name);
+                        parent.Add(child);
+                        ConvertElement(prop.Value, child);
+                    }
+                    break;
+                case JsonValueKind.Array:
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        var itemEl = new XElement("Item");
+                        parent.Add(itemEl);
+                        ConvertElement(item, itemEl);
+                    }
+                    break;
+                case JsonValueKind.String:
+                    parent.Value = element.GetString();
+                    break;
+                case JsonValueKind.Number:
+                    parent.Value = element.GetRawText();
+                    break;
+                case JsonValueKind.True:
+                case JsonValueKind.False:
+                    parent.Value = element.GetBoolean().ToString();
+                    break;
+                case JsonValueKind.Null:
+                    parent.Value = string.Empty;
+                    break;
+                default:
+                    parent.Value = element.GetRawText();
+                    break;
+            }
+        }
+    }
+}
